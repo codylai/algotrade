@@ -14,8 +14,8 @@ BYBIT:
 ASSET:
   cex_symbol: "BTCUSDT"
   glassnode_symbol: "BTC"
-  since: 1733072381   # GMT: Sunday, December 1, 2024 4:59:41 PM by https://epochconverter.com
-  timeframe: "1hr"
+  since: 1672502400   # GMT: Sunday, December 1, 2024 4:59:41 PM by https://epochconverter.com
+  timeframe: "1h"
 
 # Strategy setting - total ratio of all strategy should be 1 for portfolio management ; x,y - optimized params of each strategy
 # put ratio = 0 to disabled that strategy

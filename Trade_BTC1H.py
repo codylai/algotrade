@@ -195,7 +195,7 @@ def main():
         # print('Now:', datetime.datetime.now(),'Balance:',EXCHANGE.fetch_balance()['USDT']['total'],'Current Position:',current_pos())
         print('Now:', datetime.datetime.now(),'Bal:',EXCHANGE.fetch_balance()['USDT']['total'],'Pos:',current_pos())
 
-        if now.minute == 11 and now.second == 0:
+        if now.second == 0:
             thread_1 = threading.Thread(
                 target=fetch_data,
                 args=(config['STRAT1']['api'], config['STRAT1']['api_symbol'], "gn_data_1"))
@@ -217,8 +217,8 @@ def main():
             # Update position
             signal = calculate_position()
             execute_trade(signal)
-            # time.sleep(3540)
-        time.sleep(1)
+            time.sleep(1)
+        time.sleep(0.2)
 
 if __name__ == "__main__":
     try:

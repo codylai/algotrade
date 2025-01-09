@@ -10,7 +10,7 @@ from io import StringIO
 import warnings
 
 # Load configuration from config.yaml file
-config_file = 'config_BTC1H.yaml'
+config_file = 'config_BTC.yaml'
 with open(config_file) as f:
     config = yaml.safe_load(f)
 print('Loading config file',config_file,".....")
@@ -25,16 +25,15 @@ EXCHANGE = ccxt.bybit({
 SYMBOL = config['ASSET']['cex_symbol']
 GLASSNODE_SYMBOL = config['ASSET']['glassnode_symbol']
 DATESTART = config['ASSET']['since']
-TIMEFRAME = config['ASSET']['timeframe']
 
 print('Symbol:', SYMBOL)
 print('Glassnode price:', GLASSNODE_SYMBOL)
 print('Since:', DATESTART)
-print('Timeframe:', TIMEFRAME)
 print('Max. Position:', MAX_POS)
-print('Strat1:', config['STRAT1']['ratio'], config['STRAT1']['x'], config['STRAT1']['y'],config['STRAT1']['api'],config['STRAT1']['api_symbol'])
-print('Strat2:', config['STRAT2']['ratio'], config['STRAT2']['x'], config['STRAT2']['y'],config['STRAT2']['api'],config['STRAT2']['api_symbol'])
-print('Strat3:', config['STRAT3']['ratio'], config['STRAT3']['x'], config['STRAT3']['y'],config['STRAT3']['api'],config['STRAT3']['api_symbol'])
+print('Strat1:', config['STRAT1']['ratio'], config['STRAT1']['x'], config['STRAT1']['y'],config['STRAT1']['api'],config['STRAT1']['api_symbol'],config['STRAT1']['resolution'])
+print('Strat2:', config['STRAT2']['ratio'], config['STRAT2']['x'], config['STRAT2']['y'],config['STRAT2']['api'],config['STRAT2']['api_symbol'],config['STRAT2']['resolution'])
+print('Strat3:', config['STRAT3']['ratio'], config['STRAT3']['x'], config['STRAT3']['y'],config['STRAT3']['api'],config['STRAT3']['api_symbol'],config['STRAT3']['resolution'])
+
 
 # ===== Data Management in Memory =====
 gn_data_1 = pd.DataFrame(columns=['t', 'value', 'price'])
@@ -42,14 +41,19 @@ gn_data_2 = pd.DataFrame(columns=['t', 'value', 'price'])
 gn_data_3 = pd.DataFrame(columns=['t', 'value', 'price'])
 signal_data = pd.DataFrame(columns=['dt', 'pos'])
 
+# ===== Print full data table =====
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 1000)
+
 # ===== Data Fetching Functions =====
-def fetch_data(metric_url, asset, df_name):
+def fetch_data(metric_url, asset, resolution, df_name):
     """
     Fetch metric data and BTC price data, and merge them into the specified DataFrame.
     """
     since = DATESTART  # Data start time
     until = int(time.time())
-    resolution = TIMEFRAME
+    print("Fetching Data:",metric_url,asset,resolution,df_name)
 
     # Fetch metric data
     res_value = requests.get(metric_url, params={
@@ -74,6 +78,7 @@ def fetch_data(metric_url, asset, df_name):
     # Merge data
     df = pd.merge(df_value, df_price, how='inner', on='t')
     df = df.rename(columns={'v_x': 'value', 'v_y': 'price'})
+    print(df.tail(5))
 
     # Fix warning bug of pd.concat issue
     warnings.filterwarnings(
@@ -99,6 +104,8 @@ def strat_1(x, y):
     df['sd'] = df['value'].rolling(x).std()
     df['z'] = (df['value'] - df['ma']) / df['sd']
     df['pos'] = np.where(df['z'] > y, 1, 0)
+    print('Strategy1:')
+    print(df.tail(5))
     return df['pos'].iloc[-1]
 
 
@@ -114,6 +121,8 @@ def strat_2(x, y):
     df['min'] = df['value'].rolling(x).min()
     df['max'] = df['value'].rolling(x).max()
     df['pos'] = np.where((df['value'] - df['min']) / (df['max'] - df['min']) > y, 1, -1)
+    print('Strategy2:')
+    print(df.tail(5))
     return df['pos'].iloc[-1]
 
 
@@ -129,8 +138,9 @@ def strat_3(x, y):
     df['z'] = (df['value'] - df['ma']) / df['sd']
 
     df['pos'] = np.where(df['z'] > y, 1, 0)
+    print('Strategy3:')
+    print(df.tail(5))
     return df['pos'].iloc[-1]
-
 
 def calculate_position():
     """
@@ -149,7 +159,7 @@ def calculate_position():
     # Save signal to memory
     new_row = pd.DataFrame([[datetime.datetime.now(), pos]], columns=['dt', 'pos'])
     signal_data = pd.concat([signal_data, new_row], ignore_index=True)
-    print('Position:',pos)
+    print('Net position change% from signals:',f"{pos * 100:.{2}f}%")
     return pos
 
 # ===== Trading Functions =====
@@ -172,9 +182,9 @@ def execute_trade(signal):
     target_pos = MAX_POS * signal
     bet_size = round(target_pos - net_pos, 3)
 
-    print('Net Position:',net_pos)
+    print('Current Position:',net_pos)
     print('Target Position:',target_pos)
-    print('Bet Size:',bet_size)
+    print('Order size:',bet_size)
 
     try:
         if bet_size > 0:
@@ -186,39 +196,41 @@ def execute_trade(signal):
 
 def main():
     global gn_data_1, gn_data_2, gn_data_3
-    print('Start trading',SYMBOL,'with',TIMEFRAME,'timeframe.....')
+    print('Start trading',SYMBOL,'.....')
     while True:
-        now = datetime.datetime.now()
-        # print(now)
 
-        ### get account info after trade ###
-        # print('Now:', datetime.datetime.now(),'Balance:',EXCHANGE.fetch_balance()['USDT']['total'],'Current Position:',current_pos())
-        print('Now:', datetime.datetime.now(),'Bal:',EXCHANGE.fetch_balance()['USDT']['total'],'Pos:',current_pos())
+        if datetime.datetime.now().second == 0:
+        # Handle all new strategy with glassnode api resolution = 10m
+            print('\033[32mTime:', datetime.datetime.now(),'Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:', current_pos(),'\033[0m')
+            print("Running strategies with 10m resolution.....")
 
-        if now.minute == 11 and now.second == 0:
-            thread_1 = threading.Thread(
-                target=fetch_data,
-                args=(config['STRAT1']['api'], config['STRAT1']['api_symbol'], "gn_data_1"))
-            thread_2 = threading.Thread(
-                target=fetch_data,
-                args=(config['STRAT2']['api'], config['STRAT2']['api_symbol'], "gn_data_2"))
-            thread_3 = threading.Thread(
-                target=fetch_data,
-                args=(config['STRAT3']['api'], config['STRAT3']['api_symbol'], "gn_data_3"))
+            if datetime.datetime.now().minute == 11:
+                # Handle all new strategy with glassnode api resolution = 1h
+                print("Running strategies with 1h resolution.....")
+                thread_1 = threading.Thread(
+                    target=fetch_data,
+                    args=(config['STRAT1']['api'], config['STRAT1']['api_symbol'], config['STRAT1']['resolution'], "gn_data_1"))
+                thread_2 = threading.Thread(
+                    target=fetch_data,
+                    args=(config['STRAT2']['api'], config['STRAT2']['api_symbol'], config['STRAT1']['resolution'], "gn_data_2"))
+                thread_3 = threading.Thread(
+                    target=fetch_data,
+                    args=(config['STRAT3']['api'], config['STRAT3']['api_symbol'], config['STRAT1']['resolution'], "gn_data_3"))
 
-            thread_1.start()
-            thread_2.start()
-            thread_3.start()
+                thread_1.start()
+                thread_2.start()
+                thread_3.start()
 
-            thread_1.join()
-            thread_2.join()
-            thread_3.join()
+                thread_1.join()
+                thread_2.join()
+                thread_3.join()
+                execute_trade(calculate_position())  # execute trade
 
-            # Update position
-            signal = calculate_position()
-            execute_trade(signal)
-            time.sleep(1)
-        time.sleep(0.2)
+                if datetime.datetime.now().hour == 8:
+                    # Handle all new strategy with glassnode api resolution = 24h
+                    print("Running strategies with 24h resolution.....")
+
+        time.sleep(1)
 
 if __name__ == "__main__":
     try:

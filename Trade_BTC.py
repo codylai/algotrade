@@ -201,7 +201,7 @@ def main():
 
         if datetime.datetime.now().second == 0:
         # Handle all new strategy with glassnode api resolution = 10m
-            print('\033[32mTime:', datetime.datetime.now(),'Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:', current_pos(),'\033[0m')
+            print('Time:', datetime.datetime.now(),'Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:', current_pos())
             print("Running strategies with 10m resolution.....")
 
             if datetime.datetime.now().minute == 11:

@@ -194,6 +194,7 @@ def execute_trade(signal):
                 EXCHANGE.create_order(SYMBOL, 'market', 'buy', bet_size, None)
             elif bet_size < 0:
                 EXCHANGE.create_order(SYMBOL, 'market', 'sell', abs(bet_size), None)
+            break
         except Exception as e:
             print(f"Retrying ({attempt+1}/3):", str(e))
             time.sleep(2 ** attempt)  # Wait longer with each retry

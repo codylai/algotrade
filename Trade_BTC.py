@@ -92,6 +92,13 @@ def fetch_data(metric_url, asset, resolution, df_name):
     # Use globals() to dynamically update the specified global DataFrame
     globals()[df_name] = pd.concat([globals()[df_name], df]).drop_duplicates(subset=['t']).reset_index(drop=True)
 
+def print_acct_info():
+    print('Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:',
+          EXCHANGE.fetch_position(SYMBOL)['info']['side'], current_pos())
+    print('Unrealized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['unrealisedPnl'], 'Realized Pnl:',
+          EXCHANGE.fetch_position(SYMBOL)['info']['curRealisedPnl'], 'CumPnl:',
+          EXCHANGE.fetch_position(SYMBOL)['info']['cumRealisedPnl'])
+
 def strat_1(x, y):
     """
     Strategy 1: Use ETH price data to predict BTC price.
@@ -192,8 +199,11 @@ def execute_trade(signal):
         try:
             if bet_size > 0:
                 EXCHANGE.create_order(SYMBOL, 'market', 'buy', bet_size, None)
+                print(f'Buy {bet_size} {SYMBOL} successfully!')
             elif bet_size < 0:
                 EXCHANGE.create_order(SYMBOL, 'market', 'sell', abs(bet_size), None)
+                print(f'Sell {bet_size} {SYMBOL} successfully!')
+            print_acct_info()
             break
         except Exception as e:
             print(f"Retrying ({attempt+1}/3):", str(e))
@@ -202,8 +212,7 @@ def execute_trade(signal):
 def main():
     global gn_data_1, gn_data_2, gn_data_3
     print('Start trading',SYMBOL,'.....')
-    print('Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:', EXCHANGE.fetch_position(SYMBOL)['info']['side'],current_pos())
-    print('Unrealized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['unrealisedPnl'], 'Realized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['curRealisedPnl'],'CumPnl:',EXCHANGE.fetch_position(SYMBOL)['info']['cumRealisedPnl'])
+    print_acct_info()
 
     while True:
 

@@ -187,7 +187,7 @@ def execute_trade(signal):
     print('Target Position:',target_pos)
     print('Order size:',bet_size)
 
-    # Retry 3 times when error
+    # Retry 3 times when exception
     for attempt in range(3):
         try:
             if bet_size > 0:

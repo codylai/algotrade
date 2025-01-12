@@ -21,6 +21,7 @@ MAX_POS = config['BYBIT']['max_pos']  # Maximum position size (BTC)
 EXCHANGE = ccxt.bybit({
     'apiKey': config['BYBIT']['apiKey'],
     'secret': config['BYBIT']['secret'],
+    'rateLimit': True,  # CCXT will automatically throttle requests to comply with Bybit’s rate limits.
 })
 SYMBOL = config['ASSET']['cex_symbol']
 GLASSNODE_SYMBOL = config['ASSET']['glassnode_symbol']
@@ -186,24 +187,29 @@ def execute_trade(signal):
     print('Target Position:',target_pos)
     print('Order size:',bet_size)
 
-    try:
-        if bet_size > 0:
-            EXCHANGE.create_order(SYMBOL, 'market', 'buy', bet_size, None)
-        elif bet_size < 0:
-            EXCHANGE.create_order(SYMBOL, 'market', 'sell', abs(bet_size), None)
-    except Exception as e:
-        print(f"Error executing trade: {e}")
+    # Retry 3 times when error
+    for attempt in range(3):
+        try:
+            if bet_size > 0:
+                EXCHANGE.create_order(SYMBOL, 'market', 'buy', bet_size, None)
+            elif bet_size < 0:
+                EXCHANGE.create_order(SYMBOL, 'market', 'sell', abs(bet_size), None)
+        except Exception as e:
+            print(f"Retrying ({attempt+1}/3):", str(e))
+            time.sleep(2 ** attempt)  # Wait longer with each retry
 
 def main():
     global gn_data_1, gn_data_2, gn_data_3
     print('Start trading',SYMBOL,'.....')
+    print('Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:', EXCHANGE.fetch_position(SYMBOL)['info']['side'],current_pos())
+    print('Unrealized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['unrealisedPnl'], 'Realized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['curRealisedPnl'],'CumPnl:',EXCHANGE.fetch_position(SYMBOL)['info']['cumRealisedPnl'])
+
     while True:
 
         if datetime.datetime.now().second == 0:
         # Handle all new strategy with glassnode api resolution = 10m
-            print('Time:', datetime.datetime.now(),'Bal:', EXCHANGE.fetch_balance()['USDT']['total'], 'Pos:', EXCHANGE.fetch_position(SYMBOL)['info']['side'],current_pos())
-            print('Unrealized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['unrealisedPnl'], 'Realized Pnl:', EXCHANGE.fetch_position(SYMBOL)['info']['curRealisedPnl'],'CumPnl:',EXCHANGE.fetch_position(SYMBOL)['info']['cumRealisedPnl'])
-            print("Running strategies with 10m resolution.....")
+            print('Time:', datetime.datetime.now())
+            # print("Running strategies with 10m resolution.....")
 
             if datetime.datetime.now().minute == 11:
                 # Handle all new strategy with glassnode api resolution = 1h
